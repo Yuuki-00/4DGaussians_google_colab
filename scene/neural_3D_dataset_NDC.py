@@ -182,15 +182,37 @@ def process_videos(videos, skip_index, img_wh, downsample, transform, num_worker
                 current_index += 1
     return all_imgs
 
+def render_path_fixed(c2w, up, focal, N=120):
+    """
+    カメラの位置を固定し、向きのみc2wに基づいて返す。
+    c2w: カメラのワールド変換行列 (4x4)
+    up: 上方向ベクトル
+    focal: 注視する焦点距離
+    N: フレーム数
+    """
+    render_poses = []
+
+    # 固定カメラの位置（c2wから直接取得）
+    c = c2w[:3, 3]  # ワールド座標系でのカメラ中心
+
+    # 固定視点なのでループ内で変化させない
+    for _ in range(N):
+        z = normalize(c - np.dot(c2w[:3, :4], np.array([0, 0, -focal, 1.0])))
+        render_poses.append(viewmatrix(z, up, c))
+
+    return render_poses
+    
 def get_spiral(c2ws_all, near_fars, rads_scale=1.0, N_views=120):
     """
     Generate a set of poses using NeRF's spiral camera trajectory as validation poses.
     """
     # center pose
-    c2w = average_poses(c2ws_all)
+    # c2w = average_poses(c2ws_all)
+    c2w = c2ws_all[0]
 
     # Get average pose
-    up = normalize(c2ws_all[:, :3, 1].sum(0))
+    # up = normalize(c2ws_all[:, :3, 1].sum(0))
+    up = c2ws_all[0,:3,1]
 
     # Find a reasonable "focus depth" for this dataset
     dt = 0.75
@@ -201,9 +223,10 @@ def get_spiral(c2ws_all, near_fars, rads_scale=1.0, N_views=120):
     zdelta = near_fars.min() * 0.2
     tt = c2ws_all[:, :3, 3]
     rads = np.percentile(np.abs(tt), 90, 0) * rads_scale
-    render_poses = render_path_spiral(
-        c2w, up, rads, focal, zdelta, zrate=0.5, N=N_views
-    )
+    # render_poses = render_path_spiral(
+    #     c2w, up, rads, focal, zdelta, zrate=0.5, N=N_views
+    # )
+    render_poses = render_path_fixed(c2w, up,focal,N=N_views)
     return np.stack(render_poses)
 
 

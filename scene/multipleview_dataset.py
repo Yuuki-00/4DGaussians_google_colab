@@ -23,7 +23,7 @@ class multipleview_dataset(Dataset):
         self.FovY = focal2fov(self.focal[0], height)
         self.FovX = focal2fov(self.focal[0], width)
         self.transform = T.ToTensor()
-        self.image_paths, self.image_poses, self.image_times= self.load_images_path(cam_folder, cam_extrinsics,cam_intrinsics,split)
+        self.image_paths, self.image_poses, self.image_times, self.image_length= self.load_images_path(cam_folder, cam_extrinsics,cam_intrinsics,split)
         if split=="test":
             self.video_cam_infos=self.get_video_cam_infos(cam_folder)
         
@@ -43,6 +43,7 @@ class multipleview_dataset(Dataset):
             images_folder=os.path.join(cam_folder,"cam"+number.zfill(2))
 
             image_range=range(image_length)
+            print(f"image_length:{image_length}")
             if split=="test":
                 image_range = [image_range[0],image_range[int(image_length/3)],image_range[int(image_length*2/3)]]
 
@@ -53,14 +54,14 @@ class multipleview_dataset(Dataset):
                 image_poses.append((R,T))
                 image_times.append(float(i/image_length))
 
-        return image_paths, image_poses,image_times
+        return image_paths, image_poses,image_times, image_length
     
     def get_video_cam_infos(self,datadir):
         poses_arr = np.load(os.path.join(datadir, "poses_bounds_multipleview.npy"))
         poses = poses_arr[:, :-2].reshape([-1, 3, 5])  # (N_cams, 3, 5)
         near_fars = poses_arr[:, -2:]
         poses = np.concatenate([poses[..., 1:2], -poses[..., :1], poses[..., 2:4]], -1)
-        N_views = 300
+        N_views = self.image_length
         val_poses = get_spiral(poses, near_fars, N_views=N_views)
 
         cameras = []
